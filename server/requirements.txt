@@ -1,0 +1,11 @@
+Flask
+Flask-CORS
+Werkzeug
+Flask-SQLAlchemy
+nltk
+numpy
+pandas
+PyPDF2
+pdfplumber
+python-docx
+python-dotenv
