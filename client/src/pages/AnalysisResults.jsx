@@ -87,10 +87,15 @@ const AnalysisResults = () => {
         const parts = remainingText.split(match.sentence);
         if (parts.length > 1) {
             result.push(parts[0]);
+            
+            const colorClass = match.color === 'red' ? 'bg-red-200 dark:bg-red-900/50 text-red-900 dark:text-red-100' :
+                               match.color === 'orange' ? 'bg-orange-200 dark:bg-orange-900/50 text-orange-900 dark:text-orange-100' :
+                               'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100';
+            
             result.push(
                 <span 
                     key={match.sentence} 
-                    className={`highlight-${match.color} cursor-help`}
+                    className={`${colorClass} cursor-help rounded px-1`}
                     title={`Matched: ${match.matchedWith} (${match.score}%)`}
                 >
                     {match.sentence}
@@ -156,14 +161,17 @@ const AnalysisResults = () => {
         <div className="card">
           <h3 className="text-xl font-bold mb-6">Side-by-Side Comparison</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif leading-relaxed">
               <h4 className="font-bold mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{documents[0].name}</h4>
               {renderHighlightedText(documents[0].text, report.matches || report.matched_sentences)}
             </div>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif leading-relaxed">
               <h4 className="font-bold mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{documents[1].name}</h4>
-              {/* Highlight logic in doc2 can be reverse matched if needed */}
-              {documents[1].text}
+              {renderHighlightedText(documents[1].text, (report.matches || report.matched_sentences || []).map(m => ({
+                  ...m,
+                  sentence: m.matchedWith,
+                  matchedWith: m.sentence
+              })))}
             </div>
           </div>
         </div>
