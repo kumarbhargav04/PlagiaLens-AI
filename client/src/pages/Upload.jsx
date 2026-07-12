@@ -4,6 +4,8 @@ import { useDropzone } from 'react-dropzone';
 import { HiOutlineCloudUpload, HiOutlineDocumentText, HiOutlineX, HiOutlineRefresh } from 'react-icons/hi';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const Upload = () => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +44,7 @@ const Upload = () => {
     
     try {
       // Assuming backend is running on 5000
-      const response = await axios.post('http://localhost:5000/api/compare', formData, {
+      const response = await axios.post(`${API_URL}/api/compare`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       navigate(`/analysis/${response.data.report_id}`, { state: response.data });

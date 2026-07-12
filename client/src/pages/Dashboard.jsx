@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 import { HiOutlineUsers, HiOutlineDocumentText, HiOutlineExclamationCircle, HiOutlineTrendingUp } from 'react-icons/hi';
 import { Doughnut } from 'react-chartjs-2';
 import {
@@ -22,8 +24,8 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [statsRes, historyRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/dashboard'),
-          axios.get('http://localhost:5000/api/history')
+          axios.get(`${API_URL}/api/dashboard`),
+          axios.get(`${API_URL}/api/history`)
         ]);
         setStats(statsRes.data);
         setHistory(historyRes.data);

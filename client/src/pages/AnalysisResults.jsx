@@ -11,6 +11,8 @@ import {
   Legend,
 } from 'chart.js';
 import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 import { HiOutlineDownload, HiOutlineArrowLeft } from 'react-icons/hi';
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
@@ -27,7 +29,7 @@ const AnalysisResults = () => {
     if (!report) {
       const fetchReport = async () => {
         try {
-          const res = await axios.get(`http://localhost:5000/api/report/${reportId}`);
+          const res = await axios.get(`${API_URL}/api/report/${reportId}`);
           setReport(res.data);
         } catch (err) {
           setError("Failed to load report.");
