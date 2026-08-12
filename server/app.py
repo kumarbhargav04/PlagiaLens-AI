@@ -36,7 +36,14 @@ def create_app():
     # Configuration
     basedir = os.path.abspath(os.path.dirname(__name__))
     db_path = os.path.join(basedir, 'plagscan.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    
+    # Use DATABASE_URL from production environment if present (e.g. PostgreSQL), otherwise fallback to local SQLite
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith("postgres://"):
+        # SQLAlchemy 1.4+ requires "postgresql://" protocol instead of "postgres://"
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+        
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url or f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
     # Uploads and Reports Directory
