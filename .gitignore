@@ -18,3 +18,5 @@ Thumbs.db
 # Project
 server/instance/
 server/plagscan.db
+server/uploads/
+server/reports/

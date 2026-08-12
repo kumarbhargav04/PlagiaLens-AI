@@ -10,3 +10,5 @@ pdfplumber
 python-docx
 python-dotenv
 gunicorn
+google-auth
+requests

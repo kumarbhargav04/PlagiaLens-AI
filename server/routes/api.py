@@ -1,8 +1,9 @@
 import os
 import uuid
-from flask import Blueprint, request, jsonify, current_app
+from functools import wraps
+from flask import Blueprint, request, jsonify, current_app, session
 from werkzeug.utils import secure_filename
-from models.database import db, Report
+from models.database import db, Report, User
 from services.document_processor import process_document
 from services.text_preprocessor import preprocess_text
 from algorithms.similarity import calculate_all_similarities, extract_keywords, get_verdict
@@ -16,11 +17,26 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({"error": "Authentication required."}), 401
+        user = db.session.get(User, user_id)
+        if not user:
+            session.clear()
+            return jsonify({"error": "User session invalid."}), 401
+        request.user = user
+        return f(*args, **kwargs)
+    return decorated_function
+
 @api_bp.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
 @api_bp.route('/compare', methods=['POST'])
+@login_required
 def compare_documents():
     if 'files' not in request.files:
         return jsonify({"error": "No files part"}), 400
@@ -69,6 +85,7 @@ def compare_documents():
     report_id = str(uuid.uuid4())
     new_report = Report(
         report_id=report_id,
+        user_id=request.user.id,
         overall_similarity=scores['overall'],
         verdict=verdict
     )
@@ -99,13 +116,15 @@ def compare_documents():
     }), 200
 
 @api_bp.route('/history', methods=['GET'])
+@login_required
 def get_history():
-    reports = Report.query.order_by(Report.created_at.desc()).limit(20).all()
+    reports = Report.query.filter_by(user_id=request.user.id).order_by(Report.created_at.desc()).limit(20).all()
     return jsonify([report.to_dict() for report in reports]), 200
 
 @api_bp.route('/dashboard', methods=['GET'])
+@login_required
 def get_dashboard_stats():
-    total_comparisons = Report.query.count()
+    total_comparisons = Report.query.filter_by(user_id=request.user.id).count()
     if total_comparisons == 0:
         return jsonify({
             "total_documents": 0,
@@ -115,7 +134,7 @@ def get_dashboard_stats():
             "flagged": 0
         }), 200
         
-    all_reports = Report.query.all()
+    all_reports = Report.query.filter_by(user_id=request.user.id).all()
     total_similarity = sum(r.overall_similarity for r in all_reports)
     avg_sim = total_similarity / total_comparisons
     highest_sim = max(r.overall_similarity for r in all_reports)
@@ -137,17 +156,32 @@ def get_dashboard_stats():
     }), 200
 
 @api_bp.route('/report/<report_id>', methods=['GET'])
+@login_required
 def get_report(report_id):
-    report = Report.query.filter_by(report_id=report_id).first()
+    report = Report.query.filter_by(report_id=report_id, user_id=request.user.id).first()
     if not report:
         return jsonify({"error": "Report not found"}), 404
     return jsonify(report.to_dict()), 200
 
 @api_bp.route('/report/<report_id>', methods=['DELETE'])
+@login_required
 def delete_report(report_id):
-    report = Report.query.filter_by(report_id=report_id).first()
+    report = Report.query.filter_by(report_id=report_id, user_id=request.user.id).first()
     if not report:
         return jsonify({"error": "Report not found"}), 404
+        
+    # Delete uploaded files on disk for safety
+    try:
+        upload_folder = current_app.config.get('UPLOAD_FOLDER')
+        docs = report.get_documents()
+        for doc in docs:
+            file_path = os.path.join(upload_folder, doc)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+    except Exception as fe:
+        print(f"Error deleting file on report deletion: {fe}")
+        
     db.session.delete(report)
     db.session.commit()
     return jsonify({"message": "Deleted successfully"}), 200
+
