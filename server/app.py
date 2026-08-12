@@ -6,6 +6,13 @@ load_dotenv()
 from flask import Flask, jsonify
 from flask_cors import CORS
 from models.database import db
+import nltk
+# Render containers are read‑only except for /tmp – use it for NLTK data
+nltk.data.path.append('/tmp')
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords', download_dir='/tmp')
 from routes.api import api_bp
 from routes.auth import auth_bp
 from sqlalchemy import inspect
