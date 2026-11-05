@@ -5,20 +5,33 @@ load_dotenv()
 
 from flask import Flask, jsonify
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from models.database import db
 import nltk
+
 # Render containers are read‑only except for /tmp – use it for NLTK data
 nltk.data.path.append('/tmp')
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', download_dir='/tmp')
+for resource, path in [
+    ('stopwords', 'corpora/stopwords'),
+    ('wordnet', 'corpora/wordnet'),
+    ('punkt_tab', 'tokenizers/punkt_tab'),
+    ('punkt', 'tokenizers/punkt')
+]:
+    try:
+        nltk.data.find(path)
+    except LookupError:
+        try:
+            nltk.download(resource, download_dir='/tmp', quiet=True)
+        except Exception:
+            pass
+
 from routes.api import api_bp
 from routes.auth import auth_bp
 from sqlalchemy import inspect
 
 def create_app():
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     # Configure Secret Key for Sessions
     app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-1234567890-change-in-production')
@@ -30,15 +43,21 @@ def create_app():
     app.config['ALLOWED_GOOGLE_DOMAIN'] = os.environ.get('ALLOWED_GOOGLE_DOMAIN')
     app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
     
+    # Determine if running in production (cross-site HTTPS)
+    is_prod = (
+        os.environ.get('FLASK_ENV') == 'production' or
+        os.environ.get('ENV') == 'production' or
+        bool(app.config['FRONTEND_URL'] and 'localhost' not in app.config['FRONTEND_URL'])
+    )
+    
     # Session Security Config
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production (HTTPS)
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = is_prod  # True for HTTPS cross-site
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_prod else 'Lax'
     
     # Configure CORS to support credentials
     CORS(app, supports_credentials=True, origins=[app.config['FRONTEND_URL']])
-
 
     # Configuration
     basedir = os.path.abspath(os.path.dirname(__name__))
@@ -88,4 +107,3 @@ app = create_app()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
