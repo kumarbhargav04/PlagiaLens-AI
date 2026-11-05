@@ -4,6 +4,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, session
 from werkzeug.utils import secure_filename
 from models.database import db, Report, User
+from services.auth_helper import get_current_user_id
 from services.document_processor import process_document
 from services.text_preprocessor import preprocess_text
 from algorithms.similarity import calculate_all_similarities, extract_keywords, get_verdict
@@ -20,7 +21,7 @@ def allowed_file(filename):
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        user_id = session.get('user_id')
+        user_id = get_current_user_id()
         if not user_id:
             return jsonify({"error": "Authentication required."}), 401
         user = db.session.get(User, user_id)

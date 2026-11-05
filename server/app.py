@@ -46,13 +46,15 @@ def create_app():
     app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
     app.config['GOOGLE_REDIRECT_URI'] = os.environ.get('GOOGLE_REDIRECT_URI')
     app.config['ALLOWED_GOOGLE_DOMAIN'] = os.environ.get('ALLOWED_GOOGLE_DOMAIN')
-    app.config['FRONTEND_URL'] = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    raw_frontend = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    frontend_url = raw_frontend.rstrip('/')
+    app.config['FRONTEND_URL'] = frontend_url
     
     # Determine if running in production (cross-site HTTPS)
     is_prod = (
         os.environ.get('FLASK_ENV') == 'production' or
         os.environ.get('ENV') == 'production' or
-        bool(app.config['FRONTEND_URL'] and 'localhost' not in app.config['FRONTEND_URL'])
+        bool(frontend_url and 'localhost' not in frontend_url)
     )
     
     # Session Security Config
@@ -61,8 +63,19 @@ def create_app():
     app.config['SESSION_COOKIE_SECURE'] = is_prod  # True for HTTPS cross-site
     app.config['SESSION_COOKIE_SAMESITE'] = 'None' if is_prod else 'Lax'
     
-    # Configure CORS to support credentials
-    CORS(app, supports_credentials=True, origins=[app.config['FRONTEND_URL']])
+    # Configure CORS to support credentials across local dev and Vercel deployments
+    import re
+    allowed_origins = [
+        frontend_url,
+        f'{frontend_url}/',
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:3000',
+        re.compile(r'^https://.*\.vercel\.app$')
+    ]
+    allowed_origins = [o for o in allowed_origins if o]
+    CORS(app, supports_credentials=True, origins=allowed_origins)
 
     # Configuration - use file directory instead of __name__
     basedir = os.path.abspath(os.path.dirname(__file__))

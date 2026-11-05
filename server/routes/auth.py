@@ -10,6 +10,12 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from models.database import db, User, AuthEvent, Report
+from services.auth_helper import (
+    generate_signed_state,
+    verify_signed_state,
+    generate_auth_token,
+    get_current_user_id
+)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -71,7 +77,8 @@ def google_login():
     if not client_id or not redirect_uri:
         return jsonify({"error": "Google OAuth is not configured on the server."}), 500
         
-    state = secrets.token_urlsafe(32)
+    secret_key = current_app.secret_key or 'oauth-fallback-key'
+    state = generate_signed_state(secret_key)
     nonce = secrets.token_urlsafe(32)
     
     session['oauth_state'] = state
@@ -89,6 +96,11 @@ def google_login():
     }
     
     auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    
+    # If accessed directly via browser address bar or link navigation, redirect directly
+    if request.accept_mimetypes.accept_html and 'application/json' not in request.headers.get('Accept', ''):
+        return redirect(auth_url)
+        
     return jsonify({"auth_url": auth_url})
 
 @auth_bp.route('/google/callback', methods=['GET'])
@@ -98,6 +110,7 @@ def google_callback():
     client_id = current_app.config.get('GOOGLE_CLIENT_ID')
     client_secret = current_app.config.get('GOOGLE_CLIENT_SECRET')
     redirect_uri = current_app.config.get('GOOGLE_REDIRECT_URI')
+    secret_key = current_app.secret_key or 'oauth-fallback-key'
     
     code = request.args.get('code')
     state = request.args.get('state')
@@ -109,9 +122,16 @@ def google_callback():
         
     stored_state = session.get('oauth_state')
     
-    if not stored_state or state != stored_state:
+    # Check session-based state OR HMAC signature on the state parameter (cross-domain cookie fallback)
+    state_valid = False
+    if stored_state and state == stored_state:
+        state_valid = True
+    elif verify_signed_state(state, secret_key):
+        state_valid = True
+        
+    if not state_valid:
         log_auth_event(None, 'LOGIN_FAILURE', request)
-        return redirect(f"{frontend_url}/login?error={urllib.parse.quote('Authentication state mismatch. Security violation.')}")
+        return redirect(f"{frontend_url}/login?error={urllib.parse.quote('Authentication state mismatch or session expired.')}")
         
     # Clear state from session
     session.pop('oauth_state', None)
@@ -177,11 +197,16 @@ def google_callback():
             
         db.session.commit()
         
-        # Start user session
+        # Start user session and generate signed auth token for cross-origin frontend
         session['user_id'] = user.id
         session.permanent = True
+        auth_token = generate_auth_token(user.id, secret_key)
+        
         log_auth_event(user.id, 'LOGIN_SUCCESS', request)
-        return redirect(f"{frontend_url}/")
+        
+        # Redirect back to frontend with the auth token
+        separator = '&' if '?' in frontend_url else '?'
+        return redirect(f"{frontend_url}{separator}token={auth_token}")
         
     except Exception as e:
         print(f"Exception during OAuth callback: {e}")
@@ -191,7 +216,7 @@ def google_callback():
 @auth_bp.route('/logout', methods=['POST'])
 @rate_limit
 def logout():
-    user_id = session.get('user_id')
+    user_id = get_current_user_id()
     if user_id:
         log_auth_event(user_id, 'LOGOUT', request)
     session.clear()
@@ -200,7 +225,7 @@ def logout():
 @auth_bp.route('/me', methods=['GET'])
 @rate_limit
 def get_me():
-    user_id = session.get('user_id')
+    user_id = get_current_user_id()
     if not user_id:
         return jsonify({"authenticated": False}), 200
         
@@ -217,7 +242,7 @@ def get_me():
 @auth_bp.route('/delete-account', methods=['DELETE'])
 @rate_limit
 def delete_account():
-    user_id = session.get('user_id')
+    user_id = get_current_user_id()
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
         
