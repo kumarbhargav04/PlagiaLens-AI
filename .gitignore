@@ -20,3 +20,7 @@ server/instance/
 server/plagscan.db
 server/uploads/
 server/reports/
+
+plagscan.db
+*.db
+

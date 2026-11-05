@@ -1,13 +1,22 @@
-from nltk.tokenize import sent_tokenize
-from .similarity import get_cosine_similarity, get_sequence_matcher_similarity
 import re
+from .similarity import get_cosine_similarity, get_sequence_matcher_similarity
+
+def safe_sent_tokenize(text):
+    if not text:
+        return []
+    try:
+        from nltk.tokenize import sent_tokenize
+        return sent_tokenize(text)
+    except Exception:
+        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+        return sentences if sentences else [text]
 
 def find_matching_sentences(text1, text2, threshold=40):
     """
     Compares sentences from text1 against text2 and returns a list of matches.
     """
-    sentences1 = sent_tokenize(text1)
-    sentences2 = sent_tokenize(text2)
+    sentences1 = safe_sent_tokenize(text1)
+    sentences2 = safe_sent_tokenize(text2)
     
     matches_in_text1 = []
     

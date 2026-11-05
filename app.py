@@ -2,17 +2,25 @@ import sys
 import os
 import importlib.util
 
-server_dir = os.path.join(os.path.dirname(__file__), 'server')
-if server_dir not in sys.path:
-    sys.path.insert(0, server_dir)
+cur = os.path.dirname(os.path.abspath(__file__))
+server_dir = os.path.join(cur, 'server')
 
-server_app_path = os.path.join(server_dir, 'app.py')
-spec = importlib.util.spec_from_file_location("server_app", server_app_path)
-server_app = importlib.util.module_from_spec(spec)
-sys.modules["server_app"] = server_app
-spec.loader.exec_module(server_app)
+if os.path.isdir(server_dir):
+    server_app_file = os.path.join(server_dir, 'app.py')
+    if server_dir not in sys.path:
+        sys.path.insert(0, server_dir)
+else:
+    server_app_file = os.path.join(cur, 'app.py')
+    if cur not in sys.path:
+        sys.path.insert(0, cur)
 
-app = server_app.app
+spec = importlib.util.spec_from_file_location("plagialens_backend", server_app_file)
+mod = importlib.util.module_from_spec(spec)
+sys.modules["plagialens_backend"] = mod
+spec.loader.exec_module(mod)
+
+app = mod.app
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

@@ -10,7 +10,12 @@ from models.database import db
 import nltk
 
 # Render containers are read‑only except for /tmp – use it for NLTK data
-nltk.data.path.append('/tmp')
+nltk.data.path.extend([
+    '/opt/render/project/src/nltk_data',
+    '/tmp/nltk_data',
+    '/tmp'
+])
+
 for resource, path in [
     ('stopwords', 'corpora/stopwords'),
     ('wordnet', 'corpora/wordnet'),
@@ -59,8 +64,8 @@ def create_app():
     # Configure CORS to support credentials
     CORS(app, supports_credentials=True, origins=[app.config['FRONTEND_URL']])
 
-    # Configuration
-    basedir = os.path.abspath(os.path.dirname(__name__))
+    # Configuration - use file directory instead of __name__
+    basedir = os.path.abspath(os.path.dirname(__file__))
     db_path = os.path.join(basedir, 'plagscan.db')
     
     # Use DATABASE_URL from production environment if present (e.g. PostgreSQL), otherwise fallback to local SQLite
@@ -75,8 +80,11 @@ def create_app():
     # Uploads and Reports Directory
     app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'uploads')
     app.config['REPORT_FOLDER'] = os.path.join(basedir, 'reports')
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['REPORT_FOLDER'], exist_ok=True)
+    try:
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        os.makedirs(app.config['REPORT_FOLDER'], exist_ok=True)
+    except Exception as e:
+        print(f"Folder creation warning: {e}")
 
     # Initialize extensions
     db.init_app(app)
@@ -87,23 +95,32 @@ def create_app():
 
     # Create Database Tables and perform migration if necessary
     with app.app_context():
-        db.create_all()
-        
-        # SQLite Migration: Add user_id column to reports if not present
-        inspector = inspect(db.engine)
-        if 'reports' in inspector.get_table_names():
-            columns = [c['name'] for c in inspector.get_columns('reports')]
-            if 'user_id' not in columns:
-                try:
-                    db.session.execute(db.text("ALTER TABLE reports ADD COLUMN user_id INTEGER REFERENCES users(id)"))
-                    db.session.commit()
-                except Exception as e:
-                    print(f"Migration error (user_id): {e}")
-                    db.session.rollback()
+        try:
+            db.create_all()
+            
+            # SQLite Migration: Add user_id column to reports if not present
+            inspector = inspect(db.engine)
+            if 'reports' in inspector.get_table_names():
+                columns = [c['name'] for c in inspector.get_columns('reports')]
+                if 'user_id' not in columns:
+                    try:
+                        db.session.execute(db.text("ALTER TABLE reports ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                        db.session.commit()
+                    except Exception as e:
+                        print(f"Migration error (user_id): {e}")
+                        db.session.rollback()
+        except Exception as e:
+            print(f"Database setup warning (handled): {e}")
 
     return app
 
-app = create_app()
+try:
+    app = create_app()
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    raise
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
