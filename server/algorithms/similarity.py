@@ -18,12 +18,15 @@ DEFAULT_STOPWORDS = {
 }
 
 def fast_tokenize(text):
-    """Tokenizes preprocessed or raw text with maximum speed."""
+    """Tokenizes text by whitespace."""
     if not text:
         return []
     return text.lower().split()
 
 def get_cosine_similarity(text1, text2):
+    """
+    Computes Cosine Similarity over term frequency vectors.
+    """
     words1 = fast_tokenize(text1)
     words2 = fast_tokenize(text2)
     
@@ -42,66 +45,92 @@ def get_cosine_similarity(text1, text2):
     
     if not denominator:
         return 0.0
-    return float(numerator) / denominator * 100
+    return round(float(numerator) / denominator * 100, 2)
 
 def get_jaccard_similarity(text1, text2):
+    """
+    Computes Jaccard Similarity and Containment to detect overlapping vocabulary.
+    """
     set1 = set(fast_tokenize(text1))
     set2 = set(fast_tokenize(text2))
-    if not set1 and not set2:
+    if not set1 or not set2:
         return 0.0
-    intersection = set1.intersection(set2)
-    union = set1.union(set2)
-    return float(len(intersection)) / len(union) * 100 if union else 0.0
+        
+    inter = len(set1 & set2)
+    union = len(set1 | set2)
+    
+    containment = (inter / min(len(set1), len(set2))) * 100 if min(len(set1), len(set2)) > 0 else 0.0
+    jaccard = (inter / union) * 100 if union > 0 else 0.0
+    
+    # Balanced combination of standard Jaccard and asymmetric containment
+    return round(jaccard * 0.5 + containment * 0.5, 2)
 
-def get_sequence_matcher_similarity(text1, text2, max_tokens=3000):
+def get_sequence_matcher_similarity(text1, text2, max_tokens=4000):
     """
-    Token-based sequence matcher for high performance.
-    Comparing token lists is 10x faster than character-by-character sequence matching and avoids timeouts.
+    Token-level sequence similarity with autojunk=False.
+    Setting autojunk=False ensures repeated common terms aren't discarded as noise.
     """
     tokens1 = fast_tokenize(text1)[:max_tokens]
     tokens2 = fast_tokenize(text2)[:max_tokens]
     if not tokens1 or not tokens2:
         return 0.0
-    return difflib.SequenceMatcher(None, tokens1, tokens2).ratio() * 100
+    matcher = difflib.SequenceMatcher(None, tokens1, tokens2, autojunk=False)
+    return round(matcher.ratio() * 100, 2)
 
 def get_levenshtein_similarity(text1, text2):
     return get_sequence_matcher_similarity(text1, text2)
 
-def get_ngram_similarity(text1, text2, n=3):
+def get_ngram_similarity(text1, text2):
+    """
+    Computes bigram and trigram containment to detect multi-word copied phrases.
+    """
     words1 = fast_tokenize(text1)
     words2 = fast_tokenize(text2)
     
-    if len(words1) < n or len(words2) < n:
-        # Fallback to Jaccard on unigrams if text is shorter than n
+    if not words1 or not words2:
+        return 0.0
+        
+    def make_ngrams(w_list, n):
+        return set(zip(*[w_list[i:] for i in range(n)])) if len(w_list) >= n else set()
+        
+    bi1, bi2 = make_ngrams(words1, 2), make_ngrams(words2, 2)
+    tri1, tri2 = make_ngrams(words1, 3), make_ngrams(words2, 3)
+    
+    if not bi1 or not bi2:
         return get_jaccard_similarity(text1, text2)
         
-    ngrams1 = set(zip(*[words1[i:] for i in range(n)]))
-    ngrams2 = set(zip(*[words2[i:] for i in range(n)]))
+    bi_score = (len(bi1 & bi2) / min(len(bi1), len(bi2))) * 100
+    tri_score = (len(tri1 & tri2) / min(len(tri1), len(tri2))) * 100 if (tri1 and tri2) else bi_score
     
-    intersection = ngrams1.intersection(ngrams2)
-    union = ngrams1.union(ngrams2)
-    return float(len(intersection)) / len(union) * 100 if union else 0.0
+    return round(bi_score * 0.6 + tri_score * 0.4, 2)
 
-def get_lcs_similarity(text1, text2, max_tokens=2500):
-    """Computes Longest Common Subsequence percentage on token sequences."""
+def get_lcs_similarity(text1, text2, max_tokens=4000):
+    """
+    Computes Longest Common Subsequence percentage by summing all matching blocks.
+    Unlike find_longest_match which only captures one isolated block, this accurately measures
+    all shared passages across the documents.
+    """
     tokens1 = fast_tokenize(text1)[:max_tokens]
     tokens2 = fast_tokenize(text2)[:max_tokens]
     
     if not tokens1 or not tokens2:
         return 0.0
         
-    matcher = difflib.SequenceMatcher(None, tokens1, tokens2)
-    match = matcher.find_longest_match(0, len(tokens1), 0, len(tokens2))
+    matcher = difflib.SequenceMatcher(None, tokens1, tokens2, autojunk=False)
+    blocks = matcher.get_matching_blocks()
     
-    lcs_length = match.size
+    # Sum length of all non-trivial matching blocks (size >= 2 tokens)
+    matched_words = sum(b.size for b in blocks if b.size >= 2)
     min_length = min(len(tokens1), len(tokens2))
     
-    return (lcs_length / min_length) * 100 if min_length > 0 else 0.0
+    if min_length == 0:
+        return 0.0
+        
+    return round((matched_words / min_length) * 100, 2)
 
 def calculate_all_similarities(text1, text2):
     """
-    Computes all similarity metrics with weighted overall aggregation.
-    Optimized for sub-second execution even on 50+ page documents.
+    Calculates weighted composite similarity score across all algorithms.
     """
     cosine = get_cosine_similarity(text1, text2)
     jaccard = get_jaccard_similarity(text1, text2)
@@ -111,9 +140,9 @@ def calculate_all_similarities(text1, text2):
     
     weights = {
         "cosine": 0.25,
-        "jaccard": 0.15,
+        "jaccard": 0.20,
         "sequence": 0.20,
-        "ngram": 0.20,
+        "ngram": 0.15,
         "lcs": 0.20
     }
     
@@ -126,17 +155,16 @@ def calculate_all_similarities(text1, text2):
     )
     
     return {
-        "cosine": round(cosine, 2),
-        "jaccard": round(jaccard, 2),
-        "sequence": round(sequence, 2),
-        "ngram": round(ngram, 2),
+        "cosine": cosine,
+        "jaccard": jaccard,
+        "sequence": sequence,
+        "ngram": ngram,
         "spacy": 0.0,
-        "lcs": round(lcs, 2),
+        "lcs": lcs,
         "overall": round(overall, 2)
     }
 
 def extract_keywords(text, top_n=10):
-    """Extracts dominant keywords based on word frequency excluding stopwords."""
     if not text:
         return []
     words = [

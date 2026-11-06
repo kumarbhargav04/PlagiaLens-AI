@@ -34,7 +34,6 @@ def get_lemmatizer():
         try:
             from nltk.stem import WordNetLemmatizer
             _LEMMATIZER = WordNetLemmatizer()
-            # Pre-warm WordNet dictionary so user requests don't pay 5-second disk penalty
             _LEMMATIZER.lemmatize('test')
         except Exception:
             _LEMMATIZER = False
@@ -42,7 +41,8 @@ def get_lemmatizer():
 
 def preprocess_text(text):
     """
-    Cleans and preprocesses the text for analysis with sub-second execution:
+    Cleans and preprocesses the text for analysis:
+    - Splits camelCase / PascalCase formatting often found in PDF headings
     - Lowercases
     - Fast regex-based cleaning
     - Stopword filtering
@@ -51,10 +51,14 @@ def preprocess_text(text):
     if not text:
         return ""
     
-    # 1. Lowercase & replace non-letters with spaces
+    # 1. Split camelCase / PascalCase words (e.g. CareerObjective -> Career Objective)
+    text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+    text = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', text)
+    
+    # 2. Lowercase & replace non-letters with spaces
     text_clean = re.sub(r'[^a-z\s]', ' ', text.lower())
     
-    # 2. Fast tokenization via whitespace split
+    # 3. Fast tokenization via whitespace split
     tokens = text_clean.split()
     if not tokens:
         return ""
@@ -62,10 +66,9 @@ def preprocess_text(text):
     stop_words = get_stopwords()
     lemmatizer = get_lemmatizer()
     
-    # 3. Filter stopwords & Lemmatize efficiently with persistent memoization
+    # 4. Filter stopwords & Lemmatize efficiently with persistent memoization
     if lemmatizer:
         global _LEMMA_CACHE
-        # Find unique words not yet in our global cache
         unseen_words = set(w for w in tokens if w not in stop_words and len(w) > 1 and w not in _LEMMA_CACHE)
         for word in unseen_words:
             try:
@@ -77,5 +80,5 @@ def preprocess_text(text):
     else:
         cleaned_tokens = [w for w in tokens if w not in stop_words and len(w) > 1]
     
-    # 4. Join normalized text
+    # 5. Join normalized text
     return ' '.join(cleaned_tokens)
