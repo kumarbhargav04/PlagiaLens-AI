@@ -33,6 +33,14 @@ for resource, path in [
 from routes.api import api_bp
 from routes.auth import auth_bp
 from sqlalchemy import inspect
+from services.text_preprocessor import get_lemmatizer, get_stopwords
+
+# Pre-warm NLTK resources in memory so requests have instant sub-second response times
+try:
+    get_stopwords()
+    get_lemmatizer()
+except Exception as _pw_e:
+    print(f"Pre-warm notice: {_pw_e}")
 
 def create_app():
     app = Flask(__name__)

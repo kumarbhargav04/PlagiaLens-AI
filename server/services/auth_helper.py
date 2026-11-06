@@ -71,3 +71,4 @@ def get_current_user_id():
             return uid
             
     return session.get('user_id')
+

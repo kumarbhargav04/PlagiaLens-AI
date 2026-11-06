@@ -4,12 +4,11 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, current_app, session
 from werkzeug.utils import secure_filename
 from models.database import db, Report, User
-from services.auth_helper import get_current_user_id
 from services.document_processor import process_document
 from services.text_preprocessor import preprocess_text
 from algorithms.similarity import calculate_all_similarities, extract_keywords, get_verdict
 from algorithms.highlighter import find_matching_sentences
-from datetime import datetime, timedelta
+from services.auth_helper import get_current_user_id
 
 api_bp = Blueprint('api', __name__)
 
@@ -40,44 +39,59 @@ def health_check():
 @login_required
 def compare_documents():
     if 'files' not in request.files:
-        return jsonify({"error": "No files part"}), 400
+        return jsonify({"error": "No files provided for comparison."}), 400
         
     files = request.files.getlist('files')
     
     if len(files) < 2:
-        return jsonify({"error": "At least 2 files are required for comparison"}), 400
+        return jsonify({"error": "At least 2 files are required for comparison."}), 400
         
     processed_docs = []
     
-    # Process files
+    # Process files safely with collision prevention
     for file in files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            orig_name = secure_filename(file.filename) or "document"
+            unique_filename = f"{uuid.uuid4().hex[:8]}_{orig_name}"
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
             
             try:
                 raw_text = process_document(filepath)
+                if not raw_text or len(raw_text.strip()) < 10:
+                    return jsonify({
+                        "error": f"Document '{orig_name}' contains no readable text. If this is a scanned PDF, please upload a text-based document."
+                    }), 400
+                    
                 processed_text = preprocess_text(raw_text)
+                if not processed_text:
+                    return jsonify({
+                        "error": f"Document '{orig_name}' contains insufficient words to analyze."
+                    }), 400
+                    
                 processed_docs.append({
-                    "name": filename,
+                    "name": orig_name,
+                    "storage_name": unique_filename,
                     "raw_text": raw_text,
                     "processed_text": processed_text,
                     "keywords": extract_keywords(raw_text)
                 })
+            except ValueError as ve:
+                return jsonify({"error": f"Error in {orig_name}: {str(ve)}"}), 400
             except Exception as e:
-                return jsonify({"error": f"Error processing {filename}: {str(e)}"}), 500
+                print(f"Error processing {orig_name}: {e}")
+                return jsonify({"error": f"Error processing {orig_name}: {str(e)}"}), 500
         else:
-            return jsonify({"error": f"Invalid file format for {file.filename}"}), 400
+            return jsonify({"error": f"Invalid format for '{file.filename}'. Supported formats: PDF, DOCX, TXT."}), 400
 
-    # For MVP, just comparing the first two docs. Batch comparison logic can be expanded.
+    # Compare first two documents
     doc1 = processed_docs[0]
     doc2 = processed_docs[1]
     
     # Calculate similarities based on preprocessed text
     scores = calculate_all_similarities(doc1['processed_text'], doc2['processed_text'])
     
-    # Highlighting based on raw text
+    # Highlighting based on raw text (using optimized inverted index)
     matches = find_matching_sentences(doc1['raw_text'], doc2['raw_text'])
     
     verdict = get_verdict(scores['overall'])
@@ -90,7 +104,7 @@ def compare_documents():
         overall_similarity=scores['overall'],
         verdict=verdict
     )
-    new_report.set_documents([doc1['name'], doc2['name']])
+    new_report.set_documents([doc1['storage_name'], doc2['storage_name']])
     new_report.set_algorithm_scores(scores)
     new_report.set_matched_sentences(matches)
     
@@ -141,8 +155,6 @@ def get_dashboard_stats():
     highest_sim = max(r.overall_similarity for r in all_reports)
     flagged = sum(1 for r in all_reports if r.overall_similarity > 40)
     
-    # Estimate total documents (assuming 2 per comparison for now)
-    # Ideally should count unique filenames
     doc_set = set()
     for r in all_reports:
         for doc in r.get_documents():
@@ -171,7 +183,6 @@ def delete_report(report_id):
     if not report:
         return jsonify({"error": "Report not found"}), 404
         
-    # Delete uploaded files on disk for safety
     try:
         upload_folder = current_app.config.get('UPLOAD_FOLDER')
         docs = report.get_documents()
@@ -185,4 +196,3 @@ def delete_report(report_id):
     db.session.delete(report)
     db.session.commit()
     return jsonify({"message": "Deleted successfully"}), 200
-

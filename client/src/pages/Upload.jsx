@@ -13,8 +13,16 @@ const Upload = () => {
   const navigate = useNavigate();
 
   const onDrop = useCallback((acceptedFiles) => {
-    setFiles((prev) => [...prev, ...acceptedFiles]);
-    setError(null);
+    // Check individual file size (warn if > 25MB)
+    const validFiles = acceptedFiles.filter(file => {
+      if (file.size > 25 * 1024 * 1024) {
+        setError(`File "${file.name}" exceeds the 25MB limit. Please upload a smaller file.`);
+        return false;
+      }
+      return true;
+    });
+    setFiles((prev) => [...prev, ...validFiles]);
+    if (validFiles.length > 0) setError(null);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -43,13 +51,17 @@ const Upload = () => {
     files.forEach(file => formData.append('files', file));
     
     try {
-      // Assuming backend is running on 5000
       const response = await axios.post(`${API_URL}/api/compare`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 90000 // 90 second timeout for very large documents
       });
       navigate(`/analysis/${response.data.report_id}`, { state: response.data });
     } catch (err) {
-      setError(err.response?.data?.error || "An error occurred during comparison.");
+      if (err.code === 'ECONNABORTED') {
+        setError("The comparison took longer than expected. Please try with slightly shorter documents or test one section at a time.");
+      } else {
+        setError(err.response?.data?.error || "An error occurred during comparison. Please check that the files contain readable text.");
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +71,7 @@ const Upload = () => {
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2">Upload Documents</h1>
-        <p className="text-gray-600 dark:text-gray-400">Supported formats: PDF, DOCX, TXT. Upload at least 2 files for comparison.</p>
+        <p className="text-gray-600 dark:text-gray-400">Supported formats: PDF, DOCX, TXT. Fast multi-page processing.</p>
       </div>
 
       <div 
@@ -93,11 +105,15 @@ const Upload = () => {
               <div key={index} className="card flex items-center justify-between p-4">
                 <div className="flex items-center gap-3 overflow-hidden">
                   <HiOutlineDocumentText className="text-primary flex-shrink-0" size={24} />
-                  <span className="truncate" title={file.name}>{file.name}</span>
+                  <div className="truncate">
+                    <p className="truncate font-medium" title={file.name}>{file.name}</p>
+                    <p className="text-xs text-gray-400">{(file.size / 1024).toFixed(1)} KB</p>
+                  </div>
                 </div>
                 <button 
                   onClick={() => removeFile(index)}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-gray-400 hover:text-red-500 transition-colors p-2"
+                  disabled={loading}
                 >
                   <HiOutlineX size={20} />
                 </button>
@@ -105,18 +121,25 @@ const Upload = () => {
             ))}
           </div>
 
-          <div className="flex justify-end">
-            <button 
-              onClick={handleCompare} 
-              disabled={loading}
-              className="btn btn-primary text-lg px-8"
-            >
-              {loading ? (
-                <><HiOutlineRefresh className="animate-spin" /> Analyzing...</>
-              ) : (
-                'Start Comparison'
-              )}
-            </button>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {loading && (
+              <p className="text-sm text-gray-500 animate-pulse">
+                Extracting text & calculating similarities across documents...
+              </p>
+            )}
+            <div className="sm:ml-auto">
+              <button 
+                onClick={handleCompare} 
+                disabled={loading}
+                className="btn btn-primary text-lg px-8 flex items-center gap-2"
+              >
+                {loading ? (
+                  <><HiOutlineRefresh className="animate-spin" /> Analyzing...</>
+                ) : (
+                  'Start Comparison'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

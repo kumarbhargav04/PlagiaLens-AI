@@ -46,21 +46,20 @@ const AnalysisResults = () => {
   if (!report) return null;
 
   const { scores, documents, matches, verdict, overall_similarity } = report;
-  const algScores = scores || report.algorithm_scores;
+  const algScores = scores || report.algorithm_scores || {};
   
   // Format data for radar chart
   const chartData = {
-    labels: ['Cosine', 'Jaccard', 'Sequence', 'N-Gram', 'spaCy', 'LCS'],
+    labels: ['Cosine', 'Jaccard', 'Sequence', 'N-Gram', 'LCS'],
     datasets: [
       {
         label: 'Similarity Score (%)',
         data: [
-          algScores.cosine,
-          algScores.jaccard,
-          algScores.sequence,
-          algScores.ngram,
-          algScores.spacy,
-          algScores.lcs
+          algScores.cosine || 0,
+          algScores.jaccard || 0,
+          algScores.sequence || 0,
+          algScores.ngram || 0,
+          algScores.lcs || 0
         ],
         backgroundColor: 'rgba(79, 70, 229, 0.2)',
         borderColor: 'rgba(79, 70, 229, 1)',
@@ -73,40 +72,76 @@ const AnalysisResults = () => {
     scales: { r: { min: 0, max: 100 } }
   };
 
-  // Helper for highlighting
+  // High-performance paragraph-based highlighter for large documents
   const renderHighlightedText = (text, matchesList) => {
-    if (!text || !matchesList) return text;
-    let result = [];
-    let remainingText = text;
-    
-    // Simplistic highlight approach for MVP
-    // In production, use precise character offsets
-    const sortedMatches = [...matchesList].sort((a, b) => b.sentence.length - a.sentence.length);
-    
-    for (let match of sortedMatches) {
-        const parts = remainingText.split(match.sentence);
-        if (parts.length > 1) {
-            result.push(parts[0]);
-            
-            const colorClass = match.color === 'red' ? 'bg-red-200 dark:bg-red-900/50 text-red-900 dark:text-red-100' :
-                               match.color === 'orange' ? 'bg-orange-200 dark:bg-orange-900/50 text-orange-900 dark:text-orange-100' :
-                               'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100';
-            
-            result.push(
-                <span 
-                    key={match.sentence} 
-                    className={`${colorClass} cursor-help rounded px-1`}
-                    title={`Matched: ${match.matchedWith} (${match.score}%)`}
-                >
-                    {match.sentence}
-                </span>
-            );
-            remainingText = parts.slice(1).join(match.sentence);
-        }
+    if (!text) return null;
+    const safeMatches = matchesList || [];
+    if (safeMatches.length === 0) {
+      return text.split(/\n+/).map((para, idx) => (
+        <p key={idx} className="mb-3 leading-relaxed">
+          {para}
+        </p>
+      ));
     }
-    result.push(remainingText);
     
-    return result.length > 0 ? result : text;
+    // Build index of matched sentences
+    const matchMap = new Map();
+    safeMatches.forEach((m) => {
+      if (m.sentence && m.sentence.trim()) {
+        matchMap.set(m.sentence.trim(), m);
+      }
+    });
+
+    const paragraphs = text.split(/\n+/);
+    
+    return paragraphs.map((para, pIdx) => {
+      let paraMatches = [];
+      matchMap.forEach((m, sText) => {
+        let idx = para.indexOf(sText);
+        if (idx !== -1) {
+          paraMatches.push({ start: idx, end: idx + sText.length, match: m });
+        }
+      });
+      
+      paraMatches.sort((a, b) => a.start - b.start);
+      
+      let elements = [];
+      let cursor = 0;
+      
+      for (let i = 0; i < paraMatches.length; i++) {
+        const { start, end, match } = paraMatches[i];
+        if (start < cursor) continue;
+        
+        if (start > cursor) {
+          elements.push(para.slice(cursor, start));
+        }
+        
+        const colorClass = match.color === 'red' ? 'bg-red-200 dark:bg-red-900/50 text-red-900 dark:text-red-100' :
+                           match.color === 'orange' ? 'bg-orange-200 dark:bg-orange-900/50 text-orange-900 dark:text-orange-100' :
+                           'bg-yellow-200 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-100';
+                           
+        elements.push(
+          <span
+            key={`match-${pIdx}-${start}`}
+            className={`${colorClass} cursor-help rounded px-1 transition-colors`}
+            title={`Matched: ${match.matchedWith} (${match.score}%)`}
+          >
+            {para.slice(start, end)}
+          </span>
+        );
+        cursor = end;
+      }
+      
+      if (cursor < para.length) {
+        elements.push(para.slice(cursor));
+      }
+      
+      return (
+        <p key={`para-${pIdx}`} className="mb-3 leading-relaxed">
+          {elements}
+        </p>
+      );
+    });
   };
 
   const handleDownload = () => {
@@ -115,12 +150,12 @@ const AnalysisResults = () => {
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", `plagscan_report_${report.report_id || 'latest'}.json`);
-    document.body.appendChild(downloadAnchorNode); // required for firefox
+    document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
   };
 
-  const overall = algScores.overall || overall_similarity;
+  const overall = algScores.overall ?? overall_similarity ?? 0;
 
   let verdictColor = "text-green-500";
   if (overall > 20) verdictColor = "text-yellow-500";
@@ -161,11 +196,11 @@ const AnalysisResults = () => {
         <div className="card">
           <h3 className="text-xl font-bold mb-6">Side-by-Side Comparison</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif leading-relaxed">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto font-serif leading-relaxed">
               <h4 className="font-bold mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{documents[0].name}</h4>
               {renderHighlightedText(documents[0].text, report.matches || report.matched_sentences)}
             </div>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto whitespace-pre-wrap font-serif leading-relaxed">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50 h-[600px] overflow-y-auto font-serif leading-relaxed">
               <h4 className="font-bold mb-4 pb-2 border-b border-gray-200 dark:border-gray-700">{documents[1].name}</h4>
               {renderHighlightedText(documents[1].text, (report.matches || report.matched_sentences || []).map(m => ({
                   ...m,

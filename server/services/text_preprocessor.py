@@ -1,5 +1,4 @@
 import re
-import nltk
 
 DEFAULT_STOPWORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", 
@@ -15,64 +14,68 @@ DEFAULT_STOPWORDS = {
     "while", "who", "whom", "why", "will", "with", "you", "your", "yours", "yourself", "yourselves"
 }
 
+_STOPWORDS_CACHE = None
+_LEMMATIZER = None
+_LEMMA_CACHE = {}
+
 def get_stopwords():
-    try:
-        from nltk.corpus import stopwords
-        return set(stopwords.words('english'))
-    except Exception:
-        return DEFAULT_STOPWORDS
+    global _STOPWORDS_CACHE
+    if _STOPWORDS_CACHE is None:
+        try:
+            from nltk.corpus import stopwords
+            _STOPWORDS_CACHE = set(stopwords.words('english'))
+        except Exception:
+            _STOPWORDS_CACHE = DEFAULT_STOPWORDS
+    return _STOPWORDS_CACHE
 
 def get_lemmatizer():
-    try:
-        from nltk.stem import WordNetLemmatizer
-        return WordNetLemmatizer()
-    except Exception:
-        return None
-
-def tokenize_safe(text):
-    try:
-        from nltk.tokenize import word_tokenize
-        return word_tokenize(text)
-    except Exception:
-        return re.findall(r'[a-z]+', text)
+    global _LEMMATIZER
+    if _LEMMATIZER is None:
+        try:
+            from nltk.stem import WordNetLemmatizer
+            _LEMMATIZER = WordNetLemmatizer()
+            # Pre-warm WordNet dictionary so user requests don't pay 5-second disk penalty
+            _LEMMATIZER.lemmatize('test')
+        except Exception:
+            _LEMMATIZER = False
+    return _LEMMATIZER if _LEMMATIZER is not False else None
 
 def preprocess_text(text):
     """
-    Cleans and preprocesses the text for analysis.
+    Cleans and preprocesses the text for analysis with sub-second execution:
     - Lowercases
-    - Removes whitespace, numbers, punctuation
-    - Tokenizes
-    - Removes stop words
-    - Lemmatizes
+    - Fast regex-based cleaning
+    - Stopword filtering
+    - Global dictionary-memoized lemmatization
     """
     if not text:
         return ""
     
-    # 1. Lowercase
-    text = text.lower()
+    # 1. Lowercase & replace non-letters with spaces
+    text_clean = re.sub(r'[^a-z\s]', ' ', text.lower())
     
-    # 2. Remove special characters and numbers (keep only letters)
-    text = re.sub(r'[^a-z\s]', '', text)
-    
-    # 3. Tokenize
-    tokens = tokenize_safe(text)
-    
-    # 4. Remove stop words & Lemmatize
+    # 2. Fast tokenization via whitespace split
+    tokens = text_clean.split()
+    if not tokens:
+        return ""
+        
     stop_words = get_stopwords()
     lemmatizer = get_lemmatizer()
     
+    # 3. Filter stopwords & Lemmatize efficiently with persistent memoization
     if lemmatizer:
-        try:
-            cleaned_tokens = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
-        except Exception:
-            cleaned_tokens = [word for word in tokens if word not in stop_words]
+        global _LEMMA_CACHE
+        # Find unique words not yet in our global cache
+        unseen_words = set(w for w in tokens if w not in stop_words and len(w) > 1 and w not in _LEMMA_CACHE)
+        for word in unseen_words:
+            try:
+                _LEMMA_CACHE[word] = lemmatizer.lemmatize(word)
+            except Exception:
+                _LEMMA_CACHE[word] = word
+                
+        cleaned_tokens = [_LEMMA_CACHE[w] for w in tokens if w in _LEMMA_CACHE]
     else:
-        cleaned_tokens = [word for word in tokens if word not in stop_words]
+        cleaned_tokens = [w for w in tokens if w not in stop_words and len(w) > 1]
     
-    # 5. Join back to string
-    cleaned_text = ' '.join(cleaned_tokens)
-    
-    # 6. Whitespace normalization
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-    
-    return cleaned_text
+    # 4. Join normalized text
+    return ' '.join(cleaned_tokens)
