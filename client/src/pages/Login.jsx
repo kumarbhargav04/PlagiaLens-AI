@@ -29,14 +29,17 @@ const Login = () => {
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-secondary/10 rounded-full blur-3xl"></div>
 
-        <img
-          src="/logo.png"
-          alt="PlagiaLens AI Logo"
-          className="h-20 w-auto mx-auto mb-6 rounded-xl shadow-md"
-        />
+        <div className="relative inline-block mx-auto mb-6">
+          <div className="absolute inset-0 bg-primary/30 rounded-2xl blur-xl animate-pulse"></div>
+          <img
+            src="/logo.svg"
+            alt="PlagScan AI Logo"
+            className="h-20 w-20 mx-auto relative rounded-2xl shadow-xl transition-transform hover:scale-105 duration-300"
+          />
+        </div>
 
-        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
-          PlagiaLens AI
+        <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-secondary">
+          PlagScan AI
         </h1>
         
         <h2 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-2">

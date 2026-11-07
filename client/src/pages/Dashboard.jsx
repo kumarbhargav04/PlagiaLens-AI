@@ -61,34 +61,41 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-16">
-      <h1 className="text-3xl font-bold mb-8">Analytics Dashboard</h1>
+    <div className="max-w-7xl mx-auto pb-16 animate-fade-in">
+      <div className="flex items-center justify-between mb-8 animate-fade-in-down">
+        <div>
+          <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
+            Analytics Dashboard
+          </h1>
+          <p className="text-xs text-gray-500 mt-1">Cross-document comparison metrics & history</p>
+        </div>
+      </div>
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="card flex items-center gap-4">
-          <div className="p-4 bg-primary/10 rounded-lg text-primary"><HiOutlineDocumentText size={24} /></div>
+        <div className="card flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-in-up">
+          <div className="p-4 bg-primary/10 rounded-xl text-primary"><HiOutlineDocumentText size={24} /></div>
           <div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">Total Documents</p>
             <p className="text-2xl font-bold">{stats.total_documents}</p>
           </div>
         </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-500"><HiOutlineTrendingUp size={24} /></div>
+        <div className="card flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-in-up delay-100">
+          <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-500"><HiOutlineTrendingUp size={24} /></div>
           <div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">Total Comparisons</p>
             <p className="text-2xl font-bold">{stats.total_comparisons}</p>
           </div>
         </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-lg text-green-500"><HiOutlineTrendingUp size={24} /></div>
+        <div className="card flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-in-up delay-200">
+          <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-xl text-green-500"><HiOutlineTrendingUp size={24} /></div>
           <div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">Average Similarity</p>
             <p className="text-2xl font-bold">{stats.average_similarity}%</p>
           </div>
         </div>
-        <div className="card flex items-center gap-4">
-          <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-lg text-red-500"><HiOutlineExclamationCircle size={24} /></div>
+        <div className="card flex items-center gap-4 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-in-up delay-300">
+          <div className="p-4 bg-red-100 dark:bg-red-900/30 rounded-xl text-red-500"><HiOutlineExclamationCircle size={24} /></div>
           <div>
             <p className="text-gray-500 dark:text-gray-400 text-sm">Flagged High Risk</p>
             <p className="text-2xl font-bold">{stats.flagged}</p>

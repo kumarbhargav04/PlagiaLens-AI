@@ -99,32 +99,46 @@ const Upload = () => {
   const pairCount = (files.length * (files.length - 1)) / 2;
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">Upload Documents</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Compare <span className="font-semibold text-primary">2 or more documents</span> simultaneously — supports cross-comparison across <span className="font-semibold text-primary">PDF, Word (.docx), and TXT</span> with full pairwise screening.
+    <div className="max-w-4xl mx-auto pb-12 animate-fade-in">
+      <div className="text-center mb-8 animate-fade-in-down">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3 border border-primary/20">
+          <span>✨ Fast Multi-Document Screening</span>
+        </div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-secondary">
+          Upload Documents
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto">
+          Compare <span className="font-semibold text-primary">2 or more documents</span> simultaneously with intelligent pairwise plagiarism screening.
         </p>
       </div>
 
-      {/* Dropzone */}
+      {/* Dropzone with Smooth Animations */}
       <div 
         {...getRootProps()} 
         onClick={files.length === 0 ? open : undefined}
-        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 ${
+        className={`border-2 border-dashed rounded-3xl p-10 text-center cursor-pointer transition-all duration-500 relative overflow-hidden animate-scale-up ${
           isDragActive 
-            ? 'border-primary bg-primary/10 scale-[1.01]' 
-            : 'border-gray-300 dark:border-gray-700 hover:border-primary/70 bg-white/50 dark:bg-gray-800/50 shadow-sm'
+            ? 'border-primary bg-primary/10 scale-[1.02] shadow-xl shadow-primary/20' 
+            : 'border-gray-300 dark:border-gray-700 hover:border-primary/80 bg-white/70 dark:bg-gray-800/70 shadow-sm hover:shadow-xl hover:shadow-primary/10'
         }`}
       >
         <input {...getInputProps()} />
-        <HiOutlineCloudUpload size={52} className="mx-auto text-primary mb-3 animate-pulse" />
+        
+        {/* Animated Laser Scanline Effect during Loading */}
+        {loading && (
+          <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent animate-scanline z-10 shadow-[0_0_12px_rgba(99,102,241,0.8)]"></div>
+        )}
+
+        <div className="relative inline-block mb-3">
+          <HiOutlineCloudUpload size={54} className="mx-auto text-primary animate-float" />
+        </div>
+        
         {isDragActive ? (
-          <p className="text-lg font-medium text-primary">Drop files here to load them...</p>
+          <p className="text-lg font-bold text-primary animate-pulse">Drop files here to load them...</p>
         ) : (
           <div>
-            <p className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-1">
-              Drag & Drop your documents here, or <button type="button" onClick={open} className="text-primary underline cursor-pointer font-semibold">Browse</button>
+            <p className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-1">
+              Drag & Drop your documents here, or <button type="button" onClick={open} className="text-primary underline cursor-pointer font-bold hover:text-primary-hover transition-colors">Browse</button>
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Select 2 or more files • Supports PDF, DOCX, DOC, TXT (Up to 25 MB each)
@@ -170,7 +184,7 @@ const Upload = () => {
             {files.map((file, idx) => (
               <div 
                 key={`${file.name}-${idx}`} 
-                className="card p-4 border-2 border-primary/30 bg-white dark:bg-gray-800 shadow-sm relative group hover:border-primary/60 transition-all"
+                className="card p-4 border-2 border-primary/30 bg-white dark:bg-gray-800 shadow-sm relative group hover:border-primary/80 hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-in-up"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 overflow-hidden">

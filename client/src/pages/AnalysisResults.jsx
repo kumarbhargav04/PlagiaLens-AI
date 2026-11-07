@@ -381,13 +381,13 @@ const AnalysisResults = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-16">
+    <div className="max-w-6xl mx-auto pb-16 animate-fade-in">
       {/* Official Print Header */}
       <div className="hidden print:block mb-8 pb-4 border-b-2 border-primary">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-primary">PlagiaLens AI</h1>
-            <p className="text-sm text-gray-500">Official Plagiarism & Content Similarity Inspection Report</p>
+            <h1 className="text-3xl font-bold text-primary">PlagScan AI</h1>
+            <p className="text-sm text-gray-500">Official Plagiarism &amp; Content Similarity Inspection Report</p>
           </div>
           <div className="text-right text-xs text-gray-500">
             <p><strong>Report ID:</strong> {report.report_id || 'N/A'}</p>
@@ -400,7 +400,7 @@ const AnalysisResults = () => {
       <div className="flex items-center justify-between mb-6 print:hidden">
         <button 
           onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 text-gray-500 hover:text-primary transition-colors cursor-pointer"
+          className="flex items-center gap-2 text-gray-500 hover:text-primary transition-colors cursor-pointer font-medium"
         >
           <HiOutlineArrowLeft /> Back to Upload
         </button>
@@ -409,7 +409,7 @@ const AnalysisResults = () => {
 
       {/* Multi-Document Overview Banner & Pair Selector */}
       {isMulti && (
-        <div className="card mb-8 p-6 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent border-2 border-primary/20 shadow-sm print:hidden">
+        <div className="card mb-8 p-6 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent border-2 border-primary/20 shadow-sm print:hidden animate-scale-up">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-3 border-b border-primary/10">
             <div>
               <div className="flex items-center gap-2">
@@ -555,7 +555,7 @@ const AnalysisResults = () => {
       {/* Score Summary & Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Score Card */}
-        <div className="card lg:col-span-1 flex flex-col items-center justify-center text-center p-6 bg-white dark:bg-gray-800 shadow-md">
+        <div className="card lg:col-span-1 flex flex-col items-center justify-center text-center p-6 bg-white dark:bg-gray-800 shadow-md animate-scale-up hover:shadow-xl transition-all duration-300">
           <h2 className="text-sm font-semibold tracking-wider text-gray-500 dark:text-gray-400 uppercase mb-1">
             {isMulti ? 'Pair Similarity' : 'Overall Similarity'}
           </h2>
@@ -570,7 +570,7 @@ const AnalysisResults = () => {
           <div className="w-full space-y-2 print:hidden">
             <button 
               onClick={handlePrintPDF} 
-              className="btn btn-primary w-full flex justify-center items-center gap-2 shadow-sm cursor-pointer"
+              className="btn btn-primary w-full flex justify-center items-center gap-2 shadow-sm cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
               title="Prints or saves clean PDF directly using your browser"
             >
               <HiOutlinePrinter size={18} /> Print / Save as PDF
@@ -579,14 +579,14 @@ const AnalysisResults = () => {
             <div className="flex gap-2">
               <button 
                 onClick={handleDownloadHTML} 
-                className="btn btn-outline text-xs flex-1 flex justify-center items-center gap-1.5 py-2 cursor-pointer"
+                className="btn btn-outline text-xs flex-1 flex justify-center items-center gap-1.5 py-2 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
                 title="Download formatted offline HTML report file"
               >
                 <HiOutlineDocumentReport size={16} /> Save HTML Report
               </button>
               <button 
                 onClick={handleDownloadJSON} 
-                className="btn btn-outline text-xs flex items-center gap-1 py-2 text-gray-500 hover:text-gray-700 cursor-pointer"
+                className="btn btn-outline text-xs flex items-center gap-1 py-2 text-gray-500 hover:text-gray-700 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all duration-300"
                 title="Download raw JSON data for research/evaluation"
               >
                 <HiOutlineCode size={16} /> JSON
@@ -596,7 +596,7 @@ const AnalysisResults = () => {
         </div>
 
         {/* Radar Chart */}
-        <div className="card lg:col-span-2 p-6 bg-white dark:bg-gray-800 shadow-md">
+        <div className="card lg:col-span-2 p-6 bg-white dark:bg-gray-800 shadow-md animate-fade-in-up hover:shadow-xl transition-all duration-300">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold">Multi-Algorithm Radar Profile</h3>
             <span className="text-xs text-gray-400">5 Algorithmic Dimensions</span>
@@ -608,7 +608,7 @@ const AnalysisResults = () => {
       </div>
 
       {/* Algorithm Breakdown Section */}
-      <div className="card mb-8 p-6 bg-white dark:bg-gray-800 shadow-md">
+      <div className="card mb-8 p-6 bg-white dark:bg-gray-800 shadow-md animate-fade-in-up">
         <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
           <HiOutlineInformationCircle className="text-primary text-xl" />
           <div>
