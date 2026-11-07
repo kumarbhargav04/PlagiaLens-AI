@@ -18,17 +18,45 @@ DEFAULT_STOPWORDS = {
 
 def safe_sent_tokenize(text, max_sentences=1200):
     """
-    Splits text into sentences quickly without regex hangs.
+    Splits text into sentences/statements cleanly.
+    Splits on sentence punctuation and newline boundaries so bullet points,
+    headings, and statements are properly identified as individual units.
     Caps max sentences for very large documents to prevent worker timeouts.
     """
     if not text:
         return []
+        
+    sentences = []
+    lines = re.split(r'[\r\n]+', text)
+    
     try:
         from nltk.tokenize import sent_tokenize
-        sentences = sent_tokenize(text)
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            for s in sent_tokenize(line):
+                s_clean = s.strip()
+                if s_clean and len(s_clean.split()) >= 3:
+                    sentences.append(s_clean)
+                if len(sentences) >= max_sentences:
+                    break
+            if len(sentences) >= max_sentences:
+                break
     except Exception:
-        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
-        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            for s in re.split(r'(?<=[.!?])\s+', line):
+                s_clean = s.strip()
+                if s_clean and len(s_clean.split()) >= 3:
+                    sentences.append(s_clean)
+                if len(sentences) >= max_sentences:
+                    break
+            if len(sentences) >= max_sentences:
+                break
+                
     return sentences[:max_sentences]
 
 def find_matching_sentences(text1, text2, threshold=40, max_matches=150):
@@ -48,10 +76,7 @@ def find_matching_sentences(text1, text2, threshold=40, max_matches=150):
     s2_word_sets = []
     
     for j, s2 in enumerate(sentences2):
-        if len(s2.split()) < 4:
-            s2_word_sets.append(set())
-            continue
-        wset = set(re.findall(r'\b[a-z]{3,}\b', s2.lower())) - DEFAULT_STOPWORDS
+        wset = set(re.findall(r'\b[a-z0-9]{2,}\b', s2.lower())) - DEFAULT_STOPWORDS
         s2_word_sets.append(wset)
         for w in wset:
             word_to_s2[w].append(j)
@@ -60,10 +85,7 @@ def find_matching_sentences(text1, text2, threshold=40, max_matches=150):
 
     # 2. Query Document 1 sentences against the index
     for i, s1 in enumerate(sentences1):
-        if len(s1.split()) < 4:
-            continue
-            
-        wset1 = set(re.findall(r'\b[a-z]{3,}\b', s1.lower())) - DEFAULT_STOPWORDS
+        wset1 = set(re.findall(r'\b[a-z0-9]{2,}\b', s1.lower())) - DEFAULT_STOPWORDS
         if len(wset1) < 2:
             continue
             
@@ -92,7 +114,7 @@ def find_matching_sentences(text1, text2, threshold=40, max_matches=150):
                 continue
                 
             s2 = sentences2[j]
-            score = difflib.SequenceMatcher(None, s1, s2).ratio() * 100
+            score = difflib.SequenceMatcher(None, s1, s2, autojunk=False).ratio() * 100
             if score > best_score:
                 best_score = score
                 best_match = s2

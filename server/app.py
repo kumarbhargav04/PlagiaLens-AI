@@ -35,10 +35,11 @@ from routes.auth import auth_bp
 from sqlalchemy import inspect
 from services.text_preprocessor import get_lemmatizer, get_stopwords
 
-# Pre-warm NLTK resources in memory so requests have instant sub-second response times
+# Pre-warm NLTK resources and libraries in memory so requests have instant sub-second response times
 try:
     get_stopwords()
     get_lemmatizer()
+    import pypdfium2
 except Exception as _pw_e:
     print(f"Pre-warm notice: {_pw_e}")
 

@@ -18,14 +18,17 @@ DEFAULT_STOPWORDS = {
 }
 
 def fast_tokenize(text):
-    """Tokenizes text by whitespace."""
+    """Fast tokenization: extracts words and numbers, lowercase."""
     if not text:
         return []
-    return text.lower().split()
+    return re.findall(r'\b[a-z0-9]+\b', text.lower())
 
 def get_cosine_similarity(text1, text2):
     """
-    Computes Cosine Similarity over term frequency vectors.
+    Computes Cosine Similarity and Word Overlap Coefficient.
+    In plagiarism detection, if text1 is embedded inside text2 (or vice versa),
+    overlap coefficient ensures the copied content is accurately detected rather
+    than suppressed by document length discrepancy.
     """
     words1 = fast_tokenize(text1)
     words2 = fast_tokenize(text2)
@@ -37,19 +40,28 @@ def get_cosine_similarity(text1, text2):
     vec2 = Counter(words2)
     
     intersection = set(vec1.keys()) & set(vec2.keys())
+    if not intersection:
+        return 0.0
+        
+    # Standard symmetric cosine
     numerator = sum([vec1[x] * vec2[x] for x in intersection])
-    
     sum1 = sum([vec1[x]**2 for x in vec1.keys()])
     sum2 = sum([vec2[x]**2 for x in vec2.keys()])
     denominator = math.sqrt(sum1) * math.sqrt(sum2)
+    sym_cosine = (float(numerator) / denominator * 100) if denominator else 0.0
     
-    if not denominator:
-        return 0.0
-    return round(float(numerator) / denominator * 100, 2)
+    # Asymmetric Overlap Coefficient: shared word count / min(total words)
+    shared_count = sum(min(vec1[x], vec2[x]) for x in intersection)
+    min_total = min(len(words1), len(words2))
+    overlap_score = (shared_count / min_total * 100) if min_total > 0 else 0.0
+    
+    return round(max(sym_cosine, overlap_score), 2)
 
 def get_jaccard_similarity(text1, text2):
     """
     Computes Jaccard Similarity and Containment to detect overlapping vocabulary.
+    Standard Jaccard (inter / union) can be heavily diluted if one document is longer.
+    Combining with Containment (inter / min_unique) accurately detects copied source text.
     """
     set1 = set(fast_tokenize(text1))
     set2 = set(fast_tokenize(text2))
@@ -57,25 +69,40 @@ def get_jaccard_similarity(text1, text2):
         return 0.0
         
     inter = len(set1 & set2)
+    if inter == 0:
+        return 0.0
+        
     union = len(set1 | set2)
+    min_len = min(len(set1), len(set2))
     
-    containment = (inter / min(len(set1), len(set2))) * 100 if min(len(set1), len(set2)) > 0 else 0.0
-    jaccard = (inter / union) * 100 if union > 0 else 0.0
+    jaccard_raw = (inter / union) * 100 if union > 0 else 0.0
+    containment = (inter / min_len) * 100 if min_len > 0 else 0.0
     
-    # Balanced combination of standard Jaccard and asymmetric containment
-    return round(jaccard * 0.5 + containment * 0.5, 2)
+    # If one document's vocabulary is completely contained in the other, score reflects high containment
+    calibrated = max(jaccard_raw, containment * 0.85 + jaccard_raw * 0.15)
+    return round(calibrated, 2)
 
-def get_sequence_matcher_similarity(text1, text2, max_tokens=4000):
+def get_sequence_matcher_similarity(text1, text2, max_tokens=6000):
     """
-    Token-level sequence similarity with autojunk=False.
-    Setting autojunk=False ensures repeated common terms aren't discarded as noise.
+    Token-level sequence similarity calibrated for plagiarism detection.
+    Measures matching contiguous blocks relative to the shorter text (containment)
+    with autojunk=False so repeated terms aren't ignored.
     """
     tokens1 = fast_tokenize(text1)[:max_tokens]
     tokens2 = fast_tokenize(text2)[:max_tokens]
     if not tokens1 or not tokens2:
         return 0.0
+        
     matcher = difflib.SequenceMatcher(None, tokens1, tokens2, autojunk=False)
-    return round(matcher.ratio() * 100, 2)
+    blocks = matcher.get_matching_blocks()
+    matched_tokens = sum(b.size for b in blocks if b.size >= 2)
+    min_len = min(len(tokens1), len(tokens2))
+    
+    if min_len == 0:
+        return 0.0
+        
+    seq_ratio = (matched_tokens / min_len) * 100
+    return round(min(seq_ratio, 100.0), 2)
 
 def get_levenshtein_similarity(text1, text2):
     return get_sequence_matcher_similarity(text1, text2)
@@ -99,16 +126,15 @@ def get_ngram_similarity(text1, text2):
     if not bi1 or not bi2:
         return get_jaccard_similarity(text1, text2)
         
-    bi_score = (len(bi1 & bi2) / min(len(bi1), len(bi2))) * 100
-    tri_score = (len(tri1 & tri2) / min(len(tri1), len(tri2))) * 100 if (tri1 and tri2) else bi_score
+    bi_score = (len(bi1 & bi2) / min(len(bi1), len(bi2))) * 100 if min(len(bi1), len(bi2)) else 0.0
+    tri_score = (len(tri1 & tri2) / min(len(tri1), len(tri2))) * 100 if (tri1 and tri2 and min(len(tri1), len(tri2))) else bi_score
     
     return round(bi_score * 0.6 + tri_score * 0.4, 2)
 
-def get_lcs_similarity(text1, text2, max_tokens=4000):
+def get_lcs_similarity(text1, text2, max_tokens=6000):
     """
-    Computes Longest Common Subsequence percentage by summing all matching blocks.
-    Unlike find_longest_match which only captures one isolated block, this accurately measures
-    all shared passages across the documents.
+    Computes Longest Common Subsequence percentage by summing all matching blocks
+    relative to the shorter document.
     """
     tokens1 = fast_tokenize(text1)[:max_tokens]
     tokens2 = fast_tokenize(text2)[:max_tokens]
@@ -119,14 +145,13 @@ def get_lcs_similarity(text1, text2, max_tokens=4000):
     matcher = difflib.SequenceMatcher(None, tokens1, tokens2, autojunk=False)
     blocks = matcher.get_matching_blocks()
     
-    # Sum length of all non-trivial matching blocks (size >= 2 tokens)
     matched_words = sum(b.size for b in blocks if b.size >= 2)
     min_length = min(len(tokens1), len(tokens2))
     
     if min_length == 0:
         return 0.0
         
-    return round((matched_words / min_length) * 100, 2)
+    return round(min((matched_words / min_length) * 100, 100.0), 2)
 
 def calculate_all_similarities(text1, text2):
     """
@@ -161,7 +186,7 @@ def calculate_all_similarities(text1, text2):
         "ngram": ngram,
         "spacy": 0.0,
         "lcs": lcs,
-        "overall": round(overall, 2)
+        "overall": round(min(overall, 100.0), 2)
     }
 
 def extract_keywords(text, top_n=10):

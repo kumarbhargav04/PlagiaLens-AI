@@ -43,8 +43,7 @@ def preprocess_text(text):
     """
     Cleans and preprocesses the text for analysis:
     - Splits camelCase / PascalCase formatting often found in PDF headings
-    - Lowercases
-    - Fast regex-based cleaning
+    - Lowercases & normalizes
     - Stopword filtering
     - Global dictionary-memoized lemmatization
     """
@@ -55,8 +54,8 @@ def preprocess_text(text):
     text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
     text = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', text)
     
-    # 2. Lowercase & replace non-letters with spaces
-    text_clean = re.sub(r'[^a-z\s]', ' ', text.lower())
+    # 2. Lowercase & replace non-alphanumeric with spaces
+    text_clean = re.sub(r'[^a-z0-9\s]', ' ', text.lower())
     
     # 3. Fast tokenization via whitespace split
     tokens = text_clean.split()
