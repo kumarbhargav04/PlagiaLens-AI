@@ -7,33 +7,11 @@ const Landing = () => {
   return (
     <div className="flex flex-col gap-16 pb-16">
       {/* Hero Section */}
-      <section className="text-center pt-12">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="relative inline-block mb-6"
-        >
-          <div className="absolute inset-0 bg-primary/30 rounded-3xl blur-2xl animate-pulse"></div>
-          <img 
-            src="/logo.svg" 
-            alt="PlagScan AI Logo" 
-            className="h-24 w-24 mx-auto relative rounded-3xl shadow-2xl transition-transform hover:scale-105 duration-300" 
-          />
-        </motion.div>
-        
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6 border border-primary/20"
-        >
-          <span>🚀 PlagScan AI • Multi-Document Screening Engine</span>
-        </motion.div>
-
+      <section className="text-center pt-16">
         <motion.h1 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-5xl md:text-6xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-secondary"
+          className="text-5xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-500"
         >
           Intelligent Plagiarism Detection
         </motion.h1>

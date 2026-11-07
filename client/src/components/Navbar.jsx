@@ -28,20 +28,11 @@ const Navbar = ({ darkMode, toggleTheme }) => {
   return (
     <nav className="glass sticky top-0 z-50 p-4 mb-8">
       <div className="container flex justify-between items-center">
-        <Link to="/" className="flex items-center gap-3 group">
-          <img 
-            src="/logo.svg" 
-            alt="PlagScan AI Logo" 
-            className="h-10 w-10 rounded-xl shadow-md transition-all duration-300 group-hover:scale-105 group-hover:shadow-primary/30" 
-          />
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary via-purple-500 to-secondary leading-tight">
-              PlagScan AI
-            </span>
-            <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase -mt-0.5 hidden sm:block">
-              Intelligent Plagiarism Detector
-            </span>
-          </div>
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/logo.png" alt="PlagScan Logo" className="h-10 w-auto rounded-md shadow-sm" />
+          <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary hidden sm:block">
+            PlagiaLens AI
+          </span>
         </Link>
         
         <div className="flex items-center gap-6">
